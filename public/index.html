@@ -1,0 +1,128 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Cardápio digital da SORO Lanches. Confira lanches prensados, pizzas, sucos e bebidas.">
+  <title>SORO Lanches | Cardápio digital</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#inicio" aria-label="SORO Lanches - início">
+      <span class="brand-mark" aria-hidden="true">S</span>
+      <span class="brand-copy"><strong>SORO <em>Lanches</em></strong><small>Seu sabor, do nosso jeito.</small></span>
+    </a>
+    <div class="top-actions">
+      <button class="admin-link" id="openAdmin" type="button">Área do responsável</button>
+      <button class="cart-button" id="openCart" type="button" aria-label="Abrir carrinho">
+        <span aria-hidden="true">🛍️</span><span>Meu pedido</span><b id="cartCount">0</b>
+      </button>
+    </div>
+  </header>
+
+  <main id="inicio">
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">BEM-VINDO À SORO LANCHES</span>
+        <h1>Bateu a fome?<br><span>Seu pedido começa aqui.</span></h1>
+        <p>Escolha seu prensado, pizza, suco ou bebida favorita e monte seu pedido.</p>
+        <a class="hero-cta" href="#cardapio">Ver cardápio <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <span class="food food-one">🍔</span>
+        <span class="food food-two">🍕</span>
+        <span class="food food-three">🌭</span>
+        <span class="hero-sticker">FEITO<br>COM<br>CAPRICHO</span>
+      </div>
+    </section>
+
+    <section class="menu-section" id="cardapio">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">ESCOLHA O QUE VAI PEDIR</span>
+          <h2>Nosso cardápio</h2>
+          <p class="muted">Confira as opções e adicione seus favoritos ao pedido.</p>
+        </div>
+        <label class="search-box">
+          <span aria-hidden="true">⌕</span>
+          <input id="searchInput" type="search" placeholder="Buscar no cardápio..." autocomplete="off">
+        </label>
+      </div>
+
+      <nav class="category-list" id="categoryList" aria-label="Categorias do cardápio"></nav>
+      <div class="menu-meta"><span id="resultsLabel">Carregando opções...</span><span class="price-note">Preços a confirmar com a lanchonete.</span></div>
+      <div class="product-grid" id="productGrid" aria-live="polite"></div>
+      <div class="empty-state" id="emptyState" hidden>Nenhum item encontrado. Tente outra busca ou categoria.</div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-brand"><span class="brand-mark" aria-hidden="true">S</span><strong>SORO Lanches</strong></div>
+    <p>Obrigado pela preferência! ❤️</p>
+    <small>Cardápio digital demonstrativo — valores e disponibilidade devem ser confirmados.</small>
+  </footer>
+
+  <dialog class="dialog cart-dialog" id="cartDialog">
+    <div class="dialog-head">
+      <div><span class="eyebrow">SEU PEDIDO</span><h2>Meu carrinho</h2></div>
+      <button class="icon-button" id="closeCart" type="button" aria-label="Fechar">✕</button>
+    </div>
+    <div class="cart-items" id="cartItems"></div>
+    <div class="cart-empty" id="cartEmpty">Seu carrinho está vazio. Escolha algo gostoso no cardápio!</div>
+    <div class="cart-total" id="cartTotalRow"><span>Total estimado</span><strong id="cartTotal">A combinar</strong></div>
+        <label class="field-label" for="orderType">Como deseja receber?</label>
+    <select class="text-field" id="orderType">
+      <option value="local">Consumir no local</option>
+      <option value="retirada">Retirar no balcão</option>
+      <option value="entrega">Entrega</option>
+    </select>
+    <div id="deliveryAddressGroup" hidden>
+      <label class="field-label" for="deliveryAddress">Endereço para entrega</label>
+      <textarea class="text-field" id="deliveryAddress" rows="2" placeholder="Rua, número, bairro e complemento"></textarea>
+    </div><label class="field-label" for="customerName">Seu nome (opcional)</label>
+    <input class="text-field" id="customerName" type="text" placeholder="Como podemos chamar você?">
+    <label class="field-label" for="orderNote">Observações do pedido</label>
+    <textarea class="text-field" id="orderNote" rows="2" placeholder="Ex.: pizza grande, sem cebola, sabor do suco..."></textarea>
+    <button class="primary-button full-button" id="sendOrder" type="button">Enviar pedido pelo WhatsApp <span>↗</span></button>
+    <p class="dialog-hint">O pedido será enviado para a SORO Lanches para confirmação.</p>
+  </dialog>
+
+  <dialog class="dialog admin-dialog" id="adminDialog">
+    <div class="dialog-head">
+      <div><span class="eyebrow">EDIÇÃO DO CARDÁPIO</span><h2>Área do responsável</h2></div>
+      <button class="icon-button" id="closeAdmin" type="button" aria-label="Fechar">✕</button>
+    </div>
+    <div class="notice"><strong>Importante:</strong> esta versão salva as alterações somente neste navegador. Para atualizar o cardápio para todos os clientes pela internet, vamos conectar um banco de dados na próxima etapa.</div>
+    <section class="admin-settings">
+      <h3>Contato para pedidos</h3>
+      <label class="field-label" for="whatsappNumber">WhatsApp com DDD (somente números)</label>
+      <div class="inline-form"><input class="text-field" id="whatsappNumber" type="tel" inputmode="numeric" placeholder="Ex.: 5567999999999"><button class="secondary-button" id="saveSettings" type="button">Salvar contato</button></div>
+      <small class="help-text">Inclua o código do Brasil 55, DDD e número. Exemplo fictício: 5567999999999.</small>
+    </section>
+    <div class="admin-divider"></div>
+    <section>
+      <div class="admin-section-title"><h3 id="productFormTitle">Adicionar produto</h3><button class="text-button" id="cancelEdit" type="button" hidden>Cancelar edição</button></div>
+      <form id="productForm" class="product-form">
+        <input id="productId" type="hidden">
+        <div class="form-grid">
+          <label class="field-label">Nome do produto<input class="text-field" id="productName" type="text" required maxlength="70" placeholder="Ex.: X-Calabresa"></label>
+          <label class="field-label">Categoria<select class="text-field" id="productCategory" required></select></label>
+          <label class="field-label">Preço em reais<input class="text-field" id="productPrice" type="number" min="0" step="0.01" placeholder="Deixe vazio para definir depois"></label>
+          <label class="field-label">Emoji<input class="text-field" id="productEmoji" type="text" maxlength="6" placeholder="Ex.: 🍔"></label>
+          <label class="field-label full-field">Descrição<textarea class="text-field" id="productDescription" rows="2" maxlength="180" placeholder="Descreva os ingredientes ou opções."></textarea></label>
+        </div>
+        <button class="primary-button" id="saveProduct" type="submit">Adicionar ao cardápio</button>
+      </form>
+    </section>
+    <div class="admin-divider"></div>
+    <section>
+      <div class="admin-section-title"><h3>Produtos cadastrados</h3><button class="text-button" id="exportMenu" type="button">Exportar backup</button></div>
+      <div class="admin-product-list" id="adminProductList"></div>
+    </section>
+  </dialog>
+  <div class="dialog-backdrop" id="dialogBackdrop" hidden></div>
+</body>
+</html>
+
