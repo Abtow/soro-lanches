@@ -74,14 +74,16 @@
     <div class="cart-total" id="cartTotalRow"><span>Total estimado</span><strong id="cartTotal">A combinar</strong></div>
         <label class="field-label" for="orderType">Como deseja receber?</label>
     <select class="text-field" id="orderType">
-      <option value="local">Consumir no local</option>
       <option value="retirada">Retirar no balcão</option>
       <option value="entrega">Entrega</option>
     </select>
     <div id="deliveryAddressGroup" hidden>
       <label class="field-label" for="deliveryAddress">Endereço para entrega</label>
       <textarea class="text-field" id="deliveryAddress" rows="2" placeholder="Rua, número, bairro e complemento"></textarea>
-    </div><label class="field-label" for="customerName">Seu nome (opcional)</label>
+    </div>
+    <label class="field-label" for="customerPhone">Celular para contato *</label>
+    <input class="text-field" id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(67) 99999-9999" required>
+    <label class="field-label" for="customerName">Seu nome (opcional)</label>
     <input class="text-field" id="customerName" type="text" placeholder="Como podemos chamar você?">
     <label class="field-label" for="orderNote">Observações do pedido</label>
     <textarea class="text-field" id="orderNote" rows="2" placeholder="Ex.: pizza grande, sem cebola, sabor do suco..."></textarea>
@@ -125,4 +127,5 @@
   <div class="dialog-backdrop" id="dialogBackdrop" hidden></div>
 </body>
 </html>
+
 

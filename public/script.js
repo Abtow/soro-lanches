@@ -319,6 +319,13 @@ function sendOrder() {
 
   const orderType = $('orderType').value;
   const address = $('deliveryAddress').value.trim();
+  const customerPhone = $('customerPhone').value.replace(/\D/g, '');
+
+  if (customerPhone.length !== 10 && customerPhone.length !== 11) {
+    alert('Informe um celular válido com DDD.');
+    $('customerPhone').focus();
+    return;
+  }
 
   if (orderType === 'entrega' && !address) {
     alert('Informe o endereço para entrega.');
@@ -333,7 +340,6 @@ function sendOrder() {
   }
 
   const tipos = {
-    local: 'Consumir no local',
     retirada: 'Retirar no balcão',
     entrega: 'Entrega'
   };
@@ -341,7 +347,8 @@ function sendOrder() {
   const lines = [
     'Olá, SORO Lanches! Gostaria de fazer este pedido:',
     '',
-    `Modalidade: ${tipos[orderType]}`
+    `Modalidade: ${tipos[orderType]}`,
+    `Celular para contato: ${$('customerPhone').value.trim()}`
   ];
 
   if (orderType === 'entrega') {
@@ -526,6 +533,7 @@ populateCategorySelect();
 renderCategories();
 renderProducts();
 renderCart();
+
 
 
 
