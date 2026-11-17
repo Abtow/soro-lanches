@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -6,6 +6,7 @@
   <meta name="description" content="Cardápio digital da SORO Lanches. Confira lanches prensados, pizzas, sucos e bebidas.">
   <title>SORO Lanches | Cardápio digital</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js" defer></script>
 </head>
 <body>
@@ -52,6 +53,9 @@
       </div>
 
       <nav class="category-list" id="categoryList" aria-label="Categorias do cardápio"></nav>
+<div class="half-pizza-action" id="halfPizzaAction" hidden>
+  <button class="primary-button" id="openHalfPizza" type="button">Montar pizza meio a meio</button>
+</div>
       <div class="menu-meta"><span id="resultsLabel">Carregando opções...</span><span class="price-note">Preços a confirmar com a lanchonete.</span></div>
       <div class="product-grid" id="productGrid" aria-live="polite"></div>
       <div class="empty-state" id="emptyState" hidden>Nenhum item encontrado. Tente outra busca ou categoria.</div>
@@ -81,6 +85,18 @@
       <label class="field-label" for="deliveryAddress">Endereço para entrega</label>
       <textarea class="text-field" id="deliveryAddress" rows="2" placeholder="Rua, número, bairro e complemento"></textarea>
     </div>
+    <label class="field-label" for="paymentMethod">Forma de pagamento *</label>
+    <select class="text-field" id="paymentMethod" required>
+      <option value="">Selecione a forma de pagamento</option>
+      <option value="pix">Pix</option>
+      <option value="dinheiro">Dinheiro</option>
+      <option value="debito">Cartão de débito</option>
+      <option value="credito">Cartão de crédito</option>
+    </select>
+    <div id="changeAmountGroup" hidden>
+      <label class="field-label" for="changeAmount">Precisa de troco para quanto? (opcional)</label>
+      <input class="text-field" id="changeAmount" type="number" min="0.01" step="0.01" placeholder="Ex.: 50,00">
+    </div>
     <label class="field-label" for="customerPhone">Celular para contato *</label>
     <input class="text-field" id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(67) 99999-9999" required>
     <label class="field-label" for="customerName">Seu nome (opcional)</label>
@@ -89,6 +105,48 @@
     <textarea class="text-field" id="orderNote" rows="2" placeholder="Ex.: pizza grande, sem cebola, sabor do suco..."></textarea>
     <button class="primary-button full-button" id="sendOrder" type="button">Enviar pedido pelo WhatsApp <span>↗</span></button>
     <p class="dialog-hint">O pedido será enviado para a SORO Lanches para confirmação.</p>
+    </div>
+  </dialog>
+
+  <dialog class="dialog" id="pizzaHalfDialog">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">MONTE SUA PIZZA</span>
+        <h2>Pizza meio a meio</h2>
+      </div>
+      <button class="icon-button" id="closeHalfPizza" type="button" aria-label="Fechar">X</button>
+    </div>
+
+    <p class="dialog-hint">Escolha dois sabores da mesma categoria e o tamanho da sua pizza.</p>
+
+    <label class="field-label" for="halfPizzaCategory">Tipo de pizza</label>
+    <select class="text-field" id="halfPizzaCategory">
+      <option value="pizzas">Pizzas salgadas</option>
+      <option value="pizzas-doces">Pizzas doces</option>
+    </select>
+
+    <label class="field-label" for="halfPizzaSize">Tamanho</label>
+    <select class="text-field" id="halfPizzaSize">
+      <option value="media">Media</option>
+      <option value="grande">Grande</option>
+    </select>
+
+    <label class="field-label" for="halfPizzaFlavor1">Primeiro sabor</label>
+    <select class="text-field" id="halfPizzaFlavor1">
+      <option value="">Selecione o primeiro sabor</option>
+    </select>
+
+    <label class="field-label" for="halfPizzaFlavor2">Segundo sabor</label>
+    <select class="text-field" id="halfPizzaFlavor2">
+      <option value="">Selecione o segundo sabor</option>
+    </select>
+
+    <div class="menu-meta">
+      <strong>Preco da pizza:</strong>
+      <strong id="halfPizzaPrice">Selecione os dois sabores</strong>
+    </div>
+
+    <button class="primary-button full-button" id="addHalfPizza" type="button" disabled>Adicionar ao pedido</button>
   </dialog>
 
   <dialog class="dialog admin-dialog" id="adminDialog">
@@ -96,12 +154,26 @@
       <div><span class="eyebrow">EDIÇÃO DO CARDÁPIO</span><h2>Área do responsável</h2></div>
       <button class="icon-button" id="closeAdmin" type="button" aria-label="Fechar">✕</button>
     </div>
-    <div class="notice"><strong>Importante:</strong> esta versão salva as alterações somente neste navegador. Para atualizar o cardápio para todos os clientes pela internet, vamos conectar um banco de dados na próxima etapa.</div>
+    <section id="adminLogin" class="admin-login">
+      <h3>Acesso do responsável</h3>
+      <p>Entre com seu e-mail e senha para administrar o cardápio.</p>
+      <label class="field-label" for="adminEmail">E-mail</label>
+      <input class="text-field" id="adminEmail" type="email" autocomplete="username" placeholder="seu@email.com">
+      <label class="field-label" for="adminPassword">Senha</label>
+      <input class="text-field" id="adminPassword" type="password" autocomplete="current-password" placeholder="Sua senha">
+      <button class="primary-button" id="adminLoginButton" type="button">Entrar</button>
+      <p id="adminLoginMessage" role="alert" aria-live="polite"></p>
+    </section>
+    <div id="adminContent" hidden>
+      <button class="text-button" id="adminLogout" type="button">Sair da administração</button>
+      <div class="notice"><strong>Área protegida:</strong> administração do cardápio.</div>
     <section class="admin-settings">
       <h3>Contato para pedidos</h3>
       <label class="field-label" for="whatsappNumber">WhatsApp com DDD (somente números)</label>
-      <div class="inline-form"><input class="text-field" id="whatsappNumber" type="tel" inputmode="numeric" placeholder="Ex.: 5567999999999"><button class="secondary-button" id="saveSettings" type="button">Salvar contato</button></div>
+      <div class="inline-form"><input class="text-field" id="whatsappNumber" type="tel" inputmode="numeric" placeholder="Ex.: 5567999999999"></div>
       <small class="help-text">Inclua o código do Brasil 55, DDD e número. Exemplo fictício: 5567999999999.</small>
+      <label class="field-label" for="deliveryFee">Taxa de entrega (R$)</label>
+      <div class="inline-form"><input class="text-field" id="deliveryFee" type="number" min="0" step="0.01" placeholder="Ex.: 5,00"><button class="secondary-button" id="saveSettings" type="button">Salvar configurações</button></div>
     </section>
     <div class="admin-divider"></div>
     <section>
@@ -123,9 +195,13 @@
       <div class="admin-section-title"><h3>Produtos cadastrados</h3><button class="text-button" id="exportMenu" type="button">Exportar backup</button></div>
       <div class="admin-product-list" id="adminProductList"></div>
     </section>
+    </div>
   </dialog>
   <div class="dialog-backdrop" id="dialogBackdrop" hidden></div>
 </body>
 </html>
+
+
+
 
 

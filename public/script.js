@@ -1,7 +1,14 @@
-﻿'use strict';
+'use strict';
 
 const STORAGE_MENU = 'soro_lanches_menu_v2';
 const STORAGE_SETTINGS = 'soro_lanches_settings_v1';
+
+const SUPABASE_URL = 'https://vyvyxuunvizcdzlakide.supabase.co';
+const SUPABASE_PUBLIC_KEY = 'sb_publishable_7f_Ei_GkDt-33aIckJl3Tw_WwT6ynkA';
+const supabaseClient = window.supabase?.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLIC_KEY
+);
 
 const CATEGORIES = [
   { id: 'todos', label: 'Tudo', emoji: '✨' },
@@ -34,7 +41,7 @@ const DEFAULT_PRODUCTS = [
   produto('x-egg', 'X-Egg', 'lanches', 'Hambúrguer, ovo, presunto, mussarela, alface e tomate.', 23, '🍳'),
   produto('x-alcatra', 'X-Alcatra', 'lanches', 'Alcatra, presunto, mussarela, alface e tomate.', 30, '🥩'),
   produto('x-americano', 'X-Americano', 'lanches', 'Filé de boi, ovo, mussarela, alface e tomate.', 31, '🍔'),
-  produto('x-frango', 'X-Frango', 'lanches', 'Frango, presunto, mussarela, alface e tomate.', 23, '🍗'),
+  produto('x-frango', 'X-Frango', 'lanches', 'Frango, presunto, mussarela, alface e tomate.', 23, '\uD83C\uDF57'),
   produto('x-catufrango', 'X-Catufrango', 'lanches', 'Frango, catupiry, presunto, mussarela, alface e tomate.', 25, '🍗'),
   produto('x-file-mignon', 'X-Filé Mignon', 'lanches', 'Filé de boi, mussarela, alface e tomate.', 30, '🥩'),
   produto('x-tudo', 'X-Tudo', 'lanches', 'Hambúrguer, presunto, mussarela, alface, tomate, bacon, calabresa, frango e ovo.', 30, '🍔'),
@@ -138,6 +145,7 @@ const DEFAULT_PRODUCTS = [
 let products = loadProducts();
 let settings = loadSettings();
 if (!settings.whatsapp) settings.whatsapp = '5567999682576';
+if (!Number.isFinite(Number(settings.deliveryFee))) settings.deliveryFee = 5;
 let cart = new Map();
 let selectedCategory = 'todos';
 let searchTerm = '';
@@ -237,13 +245,30 @@ function createProductCard(product) {
   return article;
 }
 
+function normalizeSearchText(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-BR')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function matchesSearch(text, term) {
+  const searchWords = normalizeSearchText(term).split(/\s+/).filter(Boolean);
+  const productText = normalizeSearchText(text);
+
+  return searchWords.every((word) => productText.includes(word));
+}
+
 function renderProducts() {
+  $('halfPizzaAction').hidden = !['pizzas', 'pizzas-doces'].includes(selectedCategory);
   productGrid.replaceChildren();
   const visibleProducts = products.filter((product) => {
     if (!product.active) return false;
     const matchesCategory = selectedCategory === 'todos' || product.category === selectedCategory;
-    const text = `${product.name} ${product.description || ''} ${categoryName(product.category)}`.toLocaleLowerCase('pt-BR');
-    return matchesCategory && text.includes(searchTerm);
+    const text = normalizeSearchText(`${product.name} ${product.description || ''} ${categoryName(product.category)}`);
+    return matchesCategory && matchesSearch(text, searchTerm);
   });
 
   visibleProducts.forEach((product) => productGrid.appendChild(createProductCard(product)));
@@ -251,6 +276,121 @@ function renderProducts() {
   $('emptyState').hidden = visibleProducts.length !== 0;
 }
 
+function populateHalfPizzaFlavors() {
+  const category = $('halfPizzaCategory').value;
+  const size = $('halfPizzaSize').value;
+  const suffix = `-${size}`;
+
+  const available = products.filter((product) =>
+    product.active &&
+    product.category === category &&
+    product.id.endsWith(suffix) &&
+    product.price !== null &&
+    product.price !== undefined &&
+    product.price !== '' &&
+    Number.isFinite(Number(product.price))
+  );
+
+  for (const id of ['halfPizzaFlavor1', 'halfPizzaFlavor2']) {
+    const select = $(id);
+    const previous = select.value;
+    select.replaceChildren();
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = id === 'halfPizzaFlavor1'
+      ? 'Selecione o primeiro sabor'
+      : 'Selecione o segundo sabor';
+    select.appendChild(placeholder);
+
+    available.forEach((product) => {
+      const option = document.createElement('option');
+      option.value = product.id;
+      option.textContent = product.name.replace(/\s+[—-]\s+(Média|Grande)$/u, '');
+      select.appendChild(option);
+    });
+
+    if (available.some((product) => product.id === previous)) {
+      select.value = previous;
+    }
+  }
+
+  updateHalfPizzaPrice();
+}
+
+function updateHalfPizzaPrice() {
+  const first = products.find((product) => product.id === $('halfPizzaFlavor1').value);
+  const second = products.find((product) => product.id === $('halfPizzaFlavor2').value);
+  const button = $('addHalfPizza');
+  const priceLabel = $('halfPizzaPrice');
+
+  if (!first || !second) {
+    priceLabel.textContent = 'Selecione os dois sabores';
+    button.disabled = true;
+    return;
+  }
+
+  if (first.id === second.id) {
+    priceLabel.textContent = 'Escolha dois sabores diferentes';
+    button.disabled = true;
+    return;
+  }
+
+  const price = Math.ceil((Number(first.price) + Number(second.price)) / 2);
+
+  if (!Number.isFinite(price)) {
+    priceLabel.textContent = 'Preco indisponivel';
+    button.disabled = true;
+    return;
+  }
+
+  priceLabel.textContent = formatPrice(price);
+  button.disabled = false;
+}
+
+function addHalfPizzaToCart() {
+  const first = products.find((product) => product.id === $('halfPizzaFlavor1').value);
+  const second = products.find((product) => product.id === $('halfPizzaFlavor2').value);
+
+  if (!first || !second || first.id === second.id) return;
+  if (!first.active || !second.active || first.category !== second.category) return;
+
+  const size = $('halfPizzaSize').value;
+  const sizeLabel = size === 'media' ? 'Media' : 'Grande';
+  const price = Math.ceil((Number(first.price) + Number(second.price)) / 2);
+
+  if (!Number.isFinite(price)) return;
+
+  const flavors = [
+    first.name.replace(/\s+[—-]\s+(Média|Grande)$/u, ''),
+    second.name.replace(/\s+[—-]\s+(Média|Grande)$/u, '')
+  ];
+
+  const ids = [first.id, second.id].sort();
+  const id = `meio-a-meio-${size}-${ids.join('--')}`;
+
+  const product = {
+    id,
+    name: `Pizza meio a meio - ${sizeLabel}: ${flavors[0]} + ${flavors[1]}`,
+    category: first.category,
+    price,
+    emoji: '🍕',
+    active: true
+  };
+
+  const current = cart.get(id);
+  cart.set(id, { product, quantity: current ? current.quantity + 1 : 1 });
+
+  renderCart();
+  $('cartCount').textContent = [...cart.values()].reduce(
+    (sum, item) => sum + item.quantity, 0
+  );
+
+  $('openCart').classList.add('cart-pulse');
+  window.setTimeout(() => $('openCart').classList.remove('cart-pulse'), 220);
+
+  $('pizzaHalfDialog').close();
+}
 function addToCart(productId) {
   const product = products.find((item) => item.id === productId && item.active);
   if (!product) return;
@@ -319,6 +459,9 @@ function sendOrder() {
 
   const orderType = $('orderType').value;
   const address = $('deliveryAddress').value.trim();
+  const paymentMethod = $('paymentMethod').value;
+  const rawChangeAmount = $('changeAmount').value.trim().replace(',', '.');
+  const changeAmount = Number(rawChangeAmount);
   const customerPhone = $('customerPhone').value.replace(/\D/g, '');
 
   if (customerPhone.length !== 10 && customerPhone.length !== 11) {
@@ -330,6 +473,19 @@ function sendOrder() {
   if (orderType === 'entrega' && !address) {
     alert('Informe o endereço para entrega.');
     $('deliveryAddress').focus();
+    return;
+  }
+
+  if (!paymentMethod) {
+    alert('Selecione a forma de pagamento.');
+    $('paymentMethod').focus();
+    return;
+  }
+
+  if (paymentMethod === 'dinheiro' && rawChangeAmount !== '' &&
+      (!Number.isFinite(changeAmount) || changeAmount <= 0)) {
+    alert('Informe um valor válido para o troco ou deixe o campo vazio.');
+    $('changeAmount').focus();
     return;
   }
 
@@ -348,12 +504,17 @@ function sendOrder() {
     'Olá, SORO Lanches! Gostaria de fazer este pedido:',
     '',
     `Modalidade: ${tipos[orderType]}`,
-    `Celular para contato: ${$('customerPhone').value.trim()}`
+    `Celular para contato: ${$('customerPhone').value.trim()}`,
+    `Forma de pagamento: ${{ pix: 'Pix', dinheiro: 'Dinheiro', debito: 'Cartão de débito', credito: 'Cartão de crédito' }[paymentMethod]}`
   ];
+
+  if (paymentMethod === 'dinheiro' && rawChangeAmount !== '') {
+    lines.push(`Troco para: ${formatPrice(changeAmount)}`);
+  }
 
   if (orderType === 'entrega') {
     lines.push(`Endereço: ${address}`);
-    lines.push('Taxa de entrega: ' + formatPrice(5));
+    lines.push('Taxa de entrega: ' + formatPrice(Number(settings.deliveryFee ?? 5)));
   }
 
   lines.push('');
@@ -383,8 +544,8 @@ function sendOrder() {
     lines.push(
       '',
       `Subtotal dos itens: ${allPriced ? formatPrice(total) : 'a confirmar'}`,
-      'Taxa de entrega: ' + formatPrice(5),
-      'Total final: ' + (allPriced ? formatPrice(total + 5) : 'a confirmar com a lanchonete') + '.'
+      'Taxa de entrega: ' + formatPrice(Number(settings.deliveryFee ?? 5)),
+      'Total final: ' + (allPriced ? formatPrice(total + Number(settings.deliveryFee ?? 5)) : 'a confirmar com a lanchonete') + '.'
     );
   } else {
     lines.push(
@@ -402,10 +563,107 @@ function sendOrder() {
   );
 }
 
-function openAdmin() {
-  $('whatsappNumber').value = settings.whatsapp || '';
+const ADMIN_EMAIL = 'eduardoruel@gmail.com';
+
+function showAdminLogin(message = '') {
+  $('adminLogin').hidden = false;
+  $('adminContent').hidden = true;
+  $('adminLoginMessage').textContent = message;
+}
+
+async function checkAdminSession() {
+  if (!supabaseClient) {
+    showAdminLogin('Não foi possível conectar ao Supabase.');
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if (error || !data.session) {
+    showAdminLogin('');
+    return;
+  }
+
+  const email = data.session.user.email?.toLowerCase();
+
+  if (email !== ADMIN_EMAIL) {
+    await supabaseClient.auth.signOut();
+    showAdminLogin('Este usuário não tem autorização.');
+    return;
+  }
+
+  $('adminLogin').hidden = true;
+  adminContent.hidden = false;
+  whatsappNumber.value = settings.whatsapp || '';
+  await loadProductsFromSupabase(true);
+    $('deliveryFee').value = Number(settings.deliveryFee ?? 5).toFixed(2);
   renderAdminProducts();
+}
+
+function openAdmin() {
   adminDialog.showModal();
+  showAdminLogin('Verificando acesso...');
+  checkAdminSession();
+}
+
+async function adminLogin() {
+  const email = $('adminEmail').value.trim().toLowerCase();
+  const password = $('adminPassword').value;
+
+  if (email !== ADMIN_EMAIL) {
+    showAdminLogin('E-mail não autorizado.');
+    return;
+  }
+
+  if (!password) {
+    showAdminLogin('Digite sua senha.');
+    return;
+  }
+
+  if (!supabaseClient) {
+    showAdminLogin('Supabase não está disponível.');
+    return;
+  }
+
+  $('adminLoginButton').disabled = true;
+  $('adminLoginMessage').textContent = 'Entrando...';
+
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error || !data.user || data.user.email?.toLowerCase() !== ADMIN_EMAIL) {
+      await supabaseClient.auth.signOut();
+      showAdminLogin('Não foi possível entrar. Confira seu e-mail e senha.');
+      return;
+    }
+
+    $('adminPassword').value = '';
+    $('adminLogin').hidden = true;
+    adminContent.hidden = false;
+    whatsappNumber.value = settings.whatsapp || '';
+    await loadProductsFromSupabase(true);
+    $('deliveryFee').value = Number(settings.deliveryFee ?? 5).toFixed(2);
+    renderAdminProducts();
+  } catch (error) {
+    showAdminLogin('Erro ao tentar entrar. Verifique sua conexão.');
+  } finally {
+    $('adminLoginButton').disabled = false;
+  }
+}
+
+async function adminLogout() {
+  const { error } = await supabaseClient.auth.signOut();
+
+  if (error) {
+    alert('Não foi possível encerrar a sessão.');
+    return;
+  }
+
+  $('adminPassword').value = '';
+  showAdminLogin('Você saiu da administração.');
 }
 
 function renderAdminProducts() {
@@ -425,6 +683,75 @@ function renderAdminProducts() {
   });
 }
 
+
+async function loadProductsFromSupabase(adminMode = false) {
+  if (!supabaseClient) {
+    console.warn('Supabase não está disponível. Usando dados locais.');
+    return false;
+  }
+
+  try {
+    let query = supabaseClient
+      .from('products')
+      .select('*')
+      .order('display_order', { ascending: true });
+
+    if (!adminMode) {
+      query = query.eq('active', true);
+    }
+
+    const { data: productData, error: productError } = await query;
+
+    if (productError) {
+      console.error('Erro ao carregar produtos:', productError.message);
+      return false;
+    }
+
+    if (productData) {
+      products = productData.map((item) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        description: item.description || '',
+        price: item.price === null ? null : Number(item.price),
+        emoji: item.emoji || '🍽️',
+        active: item.active,
+        displayOrder: item.display_order
+      }));
+
+      localStorage.setItem(STORAGE_MENU, JSON.stringify(products));
+    }
+
+    const { data: storeData, error: storeError } = await supabaseClient
+      .from('store_settings')
+      .select('*')
+      .eq('id', 1)
+      .maybeSingle();
+
+    if (storeError) {
+      console.warn('Não foi possível carregar as configurações:', storeError.message);
+    } else if (storeData) {
+      settings.whatsapp = storeData.whatsapp || '';
+      settings.deliveryFee = Number(storeData.delivery_fee);
+      settings.storeOpen = storeData.store_open;
+      localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(settings));
+    }
+
+    renderProducts();
+    renderCart();
+
+    if (adminMode) {
+      renderAdminProducts();
+    }
+
+    console.log(`Supabase: ${products.length} produtos carregados.`);
+    return true;
+
+  } catch (error) {
+    console.error('Erro ao carregar dados do Supabase:', error.message);
+    return false;
+  }
+}
 function populateCategorySelect() {
   const select = $('productCategory');
   select.replaceChildren();
@@ -456,41 +783,126 @@ function startEdit(productId) {
   $('productName').focus();
 }
 
-function toggleProduct(productId) {
+async function toggleProduct(productId) {
   const product = products.find((item) => item.id === productId);
   if (!product) return;
-  product.active = !product.active;
-  saveProducts(); renderAdminProducts(); renderProducts();
+
+  if (!supabaseClient) {
+    alert('Supabase nao esta disponivel.');
+    return;
+  }
+
+  const novoStatus = !product.active;
+
+  const { error } = await supabaseClient
+    .from('products')
+    .update({ active: novoStatus })
+    .eq('id', productId);
+
+  if (error) {
+    alert('Nao foi possivel alterar o produto: ' + error.message);
+    return;
+  }
+
+  product.active = novoStatus;
+  saveProducts();
+  renderAdminProducts();
+  renderProducts();
 }
 
-function deleteProduct(productId) {
+async function deleteProduct(productId) {
   const product = products.find((item) => item.id === productId);
-  if (!product || !confirm(`Excluir "${product.name}" do cardápio?`)) return;
+  if (!product || !confirm(`Excluir "${product.name}" do cardapio?`)) return;
+
+  const { error } = await supabaseClient
+    .from('products')
+    .delete()
+    .eq('id', productId);
+
+  if (error) {
+    alert('Nao foi possivel excluir: ' + error.message);
+    return;
+  }
+
   products = products.filter((item) => item.id !== productId);
   cart.delete(productId);
-  saveProducts(); renderAdminProducts(); renderProducts(); renderCart();
+  saveProducts();
+  renderAdminProducts();
+  renderProducts();
+  renderCart();
 }
 
-function handleProductSubmit(event) {
+async function handleProductSubmit(event) {
   event.preventDefault();
+
+  if (!supabaseClient) {
+    alert('Supabase nao esta disponivel.');
+    return;
+  }
+
   const id = $('productId').value;
   const rawPrice = $('productPrice').value.trim();
+  const existing = id ? products.find((item) => item.id === id) : null;
+
   const productData = {
+    id: id || `produto-${Date.now()}`,
     name: $('productName').value.trim(),
     category: $('productCategory').value,
     description: $('productDescription').value.trim(),
     price: rawPrice === '' ? null : Number(rawPrice),
     emoji: $('productEmoji').value.trim() || '🍽️',
-    active: true
+    active: existing ? existing.active : true,
+    display_order: existing
+      ? (existing.displayOrder ?? products.indexOf(existing))
+      : products.length
   };
+
   if (!productData.name) return;
+
+  if (rawPrice !== '' && !Number.isFinite(productData.price)) {
+    alert('Informe um preco valido.');
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from('products')
+    .upsert(productData)
+    .select()
+    .single();
+
+  if (error) {
+    alert('Nao foi possivel salvar o produto: ' + error.message);
+    return;
+  }
+
+  const savedProduct = {
+    id: data.id,
+    name: data.name,
+    category: data.category,
+    description: data.description || '',
+    price: data.price === null ? null : Number(data.price),
+    emoji: data.emoji || '🍽️',
+    active: data.active,
+    displayOrder: data.display_order
+  };
+
   if (id) {
     const index = products.findIndex((item) => item.id === id);
-    if (index >= 0) products[index] = { ...products[index], ...productData };
+    if (index >= 0) {
+      products[index] = savedProduct;
+    } else {
+      products.push(savedProduct);
+    }
   } else {
-    products.push({ id: `produto-${Date.now()}`, ...productData });
+    products.push(savedProduct);
   }
-  saveProducts(); resetProductForm(); renderAdminProducts(); renderProducts();
+
+  saveProducts();
+  resetProductForm();
+  renderAdminProducts();
+  renderProducts();
+
+  alert('Produto salvo no Supabase com sucesso!');
 }
 
 function exportMenu() {
@@ -502,37 +914,93 @@ function exportMenu() {
 }
 
 $('searchInput').addEventListener('input', (event) => {
-  searchTerm = event.target.value.trim().toLocaleLowerCase('pt-BR');
+  searchTerm = normalizeSearchText(event.target.value);
   renderProducts();
 });
 $('openCart').addEventListener('click', () => cartDialog.showModal());
 $('closeCart').addEventListener('click', () => cartDialog.close());
 $('openAdmin').addEventListener('click', openAdmin);
+$('adminLoginButton').addEventListener('click', adminLogin);
+$('adminLogout').addEventListener('click', adminLogout);
+$('adminPassword').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') adminLogin();
+});
 $('closeAdmin').addEventListener('click', () => adminDialog.close());
 $('sendOrder').addEventListener('click', sendOrder);
 $('productForm').addEventListener('submit', handleProductSubmit);
 $('cancelEdit').addEventListener('click', resetProductForm);
 $('exportMenu').addEventListener('click', exportMenu);
-$('saveSettings').addEventListener('click', () => {
+$('saveSettings').addEventListener('click', async () => {
   const number = $('whatsappNumber').value.replace(/\D/g, '');
+  const rawFee = $('deliveryFee').value.trim().replace(',', '.');
+  const fee = Number(rawFee);
+
   if (number && (number.length < 12 || number.length > 13 || !number.startsWith('55'))) {
     alert('Confira o número. Use o formato 55 + DDD + telefone, somente números.');
     return;
   }
-  settings.whatsapp = number;
-  saveSettings();
-  alert('Contato salvo neste navegador.');
-});
 
+  if (rawFee === '' || !Number.isFinite(fee) || fee < 0) {
+    alert('Informe uma taxa de entrega válida. Use zero se não cobrar entrega.');
+    return;
+  }
+
+  if (!supabaseClient) {
+    alert('Supabase não está disponível.');
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('store_settings')
+    .upsert({ id: 1, whatsapp: number, delivery_fee: fee });
+
+  if (error) {
+    alert('Não foi possível salvar no Supabase: ' + error.message);
+    return;
+  }
+
+  settings.whatsapp = number;
+  settings.deliveryFee = fee;
+  saveSettings();
+  alert('WhatsApp e taxa de entrega salvos com sucesso!');
+});
 $('orderType').addEventListener('change', () => {
   const isDelivery = $('orderType').value === 'entrega';
   $('deliveryAddressGroup').hidden = !isDelivery;
   if (!isDelivery) $('deliveryAddress').value = '';
 });
+$('paymentMethod').addEventListener('change', () => {
+  const isCash = $('paymentMethod').value === 'dinheiro';
+  $('changeAmountGroup').hidden = !isCash;
+  if (!isCash) $('changeAmount').value = '';
+});
+
+$('openHalfPizza').addEventListener('click', () => {
+  $('halfPizzaCategory').value = selectedCategory;
+  populateHalfPizzaFlavors();
+  $('pizzaHalfDialog').showModal();
+});
+
+$('closeHalfPizza').addEventListener('click', () => {
+  $('pizzaHalfDialog').close();
+});
+
+$('halfPizzaCategory').addEventListener('change', populateHalfPizzaFlavors);
+$('halfPizzaSize').addEventListener('change', populateHalfPizzaFlavors);
+$('halfPizzaFlavor1').addEventListener('change', updateHalfPizzaPrice);
+$('halfPizzaFlavor2').addEventListener('change', updateHalfPizzaPrice);
+$('addHalfPizza').addEventListener('click', addHalfPizzaToCart);
 populateCategorySelect();
 renderCategories();
 renderProducts();
 renderCart();
+loadProductsFromSupabase(false);
+
+
+
+
+
+
 
 
 
